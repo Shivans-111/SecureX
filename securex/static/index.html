@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>SecureX — Scanner Demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --bg: #0d1420;
+    --panel: #15202e;
+    --panel2: #1b2838;
+    --orange: #ff6a2b;
+    --green: #16a34a;
+    --red: #ef4444;
+    --yellow: #eab308;
+    --text: #e8edf2;
+    --muted: #93a1b3;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 28px; margin-bottom: 4px; }
+  h1 span { color: var(--orange); }
+  .tagline { color: var(--muted); margin-top: 0; margin-bottom: 28px; }
+  .scan-bar {
+    display: flex;
+    gap: 10px;
+    background: var(--panel);
+    padding: 14px;
+    border-radius: 12px;
+    border: 1px solid #22304a;
+  }
+  input[type=text] {
+    flex: 1;
+    background: var(--panel2);
+    border: 1px solid #2c3c56;
+    border-radius: 8px;
+    padding: 12px 14px;
+    color: var(--text);
+    font-size: 15px;
+  }
+  button {
+    background: var(--orange);
+    border: none;
+    color: white;
+    font-weight: 600;
+    padding: 0 22px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 15px;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .status { margin-top: 10px; color: var(--muted); font-size: 14px; min-height: 20px; }
+  .summary {
+    display: flex;
+    gap: 14px;
+    margin: 24px 0;
+  }
+  .stat {
+    background: var(--panel);
+    border: 1px solid #22304a;
+    border-radius: 12px;
+    padding: 16px 20px;
+    flex: 1;
+  }
+  .stat .num { font-size: 26px; font-weight: 700; }
+  .stat .label { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .finding {
+    background: var(--panel);
+    border: 1px solid #22304a;
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 10px;
+  }
+  .finding-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .finding-title { font-weight: 600; font-size: 15px; }
+  .badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+  }
+  .sev-CRITICAL { background: #4a1414; color: #ff8a8a; }
+  .sev-HIGH { background: #4a2a14; color: #ffb066; }
+  .sev-MEDIUM { background: #4a4014; color: #ffe066; }
+  .sev-LOW { background: #143a1f; color: #6bdc8f; }
+  .sev-INFO { background: #15263a; color: #8fb8dc; }
+  .finding-cat { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .finding-body { margin-top: 10px; font-size: 13.5px; line-height: 1.5; color: #cdd6e0; }
+  .finding-body b { color: var(--text); }
+  .evidence {
+    margin-top: 8px;
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 12px;
+    color: var(--muted);
+    background: #0f1824;
+    padding: 6px 10px;
+    border-radius: 6px;
+    overflow-x: auto;
+  }
+  .error-box {
+    background: #2a1414;
+    border: 1px solid #5a2222;
+    color: #ff9c9c;
+    padding: 14px 18px;
+    border-radius: 10px;
+    margin-top: 20px;
+  }
+  .note { color: var(--muted); font-size: 12px; margin-top: 30px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>SECURE<span>X</span></h1>
+  <p class="tagline">Find the weakness. Fix the risk. — passive vulnerability scan demo.</p>
+
+  <div class="scan-bar">
+    <input type="text" id="urlInput" placeholder="example.com or https://example.com" />
+    <button id="scanBtn" onclick="runScan()">Scan</button>
+  </div>
+  <div class="status" id="status"></div>
+
+  <div id="results"></div>
+
+  <p class="note">Passive checks only: headers, cookies, TLS, outdated components, basic info leaks and structural signals. No exploitation or destructive payloads are sent. Only scan sites you own or are authorized to test.</p>
+</div>
+
+<script>
+const API_BASE = window.location.origin;
+
+async function runScan() {
+  const urlInput = document.getElementById('urlInput');
+  const btn = document.getElementById('scanBtn');
+  const status = document.getElementById('status');
+  const results = document.getElementById('results');
+  const url = urlInput.value.trim();
+  if (!url) return;
+
+  btn.disabled = true;
+  status.textContent = 'Checking scope and running passive checks…';
+  results.innerHTML = '';
+
+  try {
+    const resp = await fetch(`${API_BASE}/scan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
+    const data = await resp.json();
+    render(data);
+  } catch (e) {
+    status.textContent = '';
+    results.innerHTML = `<div class="error-box">Request failed: ${e}</div>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function render(data) {
+  const status = document.getElementById('status');
+  const results = document.getElementById('results');
+
+  if (data.errors && data.errors.length && !data.scan_complete) {
+    status.textContent = '';
+    results.innerHTML = `<div class="error-box">${data.errors.join('<br>')}</div>`;
+    return;
+  }
+
+  status.textContent = `Scan complete for ${data.target}`;
+
+  const s = data.summary;
+  let html = `<div class="summary">
+    <div class="stat"><div class="num">${s.total_findings}</div><div class="label">Findings</div></div>
+    <div class="stat"><div class="num">${s.high_priority}</div><div class="label">High priority</div></div>
+    <div class="stat"><div class="num">${s.by_severity.LOW + s.by_severity.INFO}</div><div class="label">Low / Info</div></div>
+  </div>`;
+
+  if (data.findings.length === 0) {
+    html += `<div class="finding">No issues detected by the passive checks. This isn't a full audit — consider a manual review too.</div>`;
+  } else {
+    for (const f of data.findings) {
+      html += `<div class="finding">
+        <div class="finding-top">
+          <div>
+            <div class="finding-title">${escapeHtml(f.title)}</div>
+            <div class="finding-cat">${escapeHtml(f.category_label)}${f.confidence === 'heuristic' ? ' · unverified, confirm manually' : ''}</div>
+          </div>
+          <span class="badge sev-${f.severity}">${f.severity}</span>
+        </div>
+        <div class="finding-body">
+          <b>Risk:</b> ${escapeHtml(f.risk)}<br>
+          <b>Fix:</b> ${escapeHtml(f.fix)}
+        </div>
+        ${f.evidence ? `<div class="evidence">${escapeHtml(f.evidence)}</div>` : ''}
+      </div>`;
+    }
+  }
+
+  results.innerHTML = html;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str ?? '';
+  return div.innerHTML;
+}
+
+document.getElementById('urlInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') runScan();
+});
+</script>
+</body>
+</html>
